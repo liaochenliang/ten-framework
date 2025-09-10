@@ -114,9 +114,6 @@ class AliyunASRBigmodelExtension(AsyncASRBaseExtension):
 
             if temp_config.model == "":
                 temp_config.model = "paraformer-realtime-v2"
-                ten_env.log_info(
-                    f"Model is empty, set to paraformer-realtime-v2"
-                )
 
             self.config = temp_config
             self.config.update(self.config.params)
