@@ -229,7 +229,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
     async def _deepgram_event_handler_on_open(self, _, event):
         """Handle the open event from Deepgram."""
         self.ten_env.log_info(
-            "vendor_status_changed: on_open",
+            f"vendor_status_changed: on_open event: {event}",
             category=LOG_CATEGORY_VENDOR,
         )
         self.sent_user_audio_duration_ms_before_last_reset += (
@@ -245,7 +245,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
     async def _deepgram_event_handler_on_close(self, *args, **kwargs):
         """Handle the close event from Deepgram."""
         self.ten_env.log_info(
-            "vendor_status_changed: on_close",
+            f"vendor_status_changed: on_close, args: {args}, kwargs: {kwargs}",
             category=LOG_CATEGORY_VENDOR,
         )
         self.connected = False
