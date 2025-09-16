@@ -138,6 +138,7 @@ class SpeechmaticsASRExtension(AsyncASRBaseExtension):
                     self.config,
                     self.ten_env,
                     self.audio_timeline,
+                    lambda: self.sent_user_audio_duration_ms_before_last_reset,  # Duration getter
                 )
                 self.client.on_asr_open = self.on_asr_open
                 self.client.on_asr_close = self.on_asr_close

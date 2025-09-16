@@ -117,7 +117,7 @@ class XfyunASRExtension(AsyncASRBaseExtension):
         self.reconnect_manager = ReconnectManager(logger=ten_env)
 
         # Initialize audio buffer manager
-        self.audio_buffer_manager = AudioBufferManager(logger=ten_env)
+        self.audio_buffer_manager = AudioBufferManager(threshold=1280, send_callback=self.send_audio_frame, ten_env=ten_env)
 
         config_json, _ = await ten_env.get_property_to_json("")
 
@@ -227,6 +227,7 @@ class XfyunASRExtension(AsyncASRBaseExtension):
                 app_id=self.config.app_id,
                 api_key=self.config.api_key,
                 api_secret=self.config.api_secret,
+                audio_timeline=self.audio_timeline,
                 ten_env=self.ten_env,
                 config=xfyun_config,
                 callback=self.recognition_callback,
@@ -270,8 +271,8 @@ class XfyunASRExtension(AsyncASRBaseExtension):
 
         # Reset audio buffer manager
         if self.audio_buffer_manager:
-            self.audio_buffer_manager.reset()
-            self.ten_env.log_debug("Audio buffer reset on connection open")
+            self.audio_buffer_manager.enable_sending()
+            self.ten_env.log_debug("Audio buffer enable_sending on connection open")
 
         # Reset timeline and audio duration
         self.sent_user_audio_duration_ms_before_last_reset += (
@@ -285,7 +286,7 @@ class XfyunASRExtension(AsyncASRBaseExtension):
 
     async def on_asr_result(self, message_data: dict) -> None:
         """Handle recognition result callback"""
-        # self.ten_env.log_debug(f"Xfyun ASR result: {message_data}")
+        self.ten_env.log_debug(f"Xfyun ASR result: {message_data}")
         try:
             code = message_data.get("code")
             if code != 0:
@@ -301,6 +302,7 @@ class XfyunASRExtension(AsyncASRBaseExtension):
 
             # Extract sentence timing information
             start_ms = result_data.get("bg", 0)  # Sentence start time, ms
+            self.ten_env.log_debug(f"Xfyun ASR result: start_ms: {start_ms}")
             end_ms = result_data.get("ed", 0)  # Sentence end time, ms
             duration_ms = end_ms - start_ms if end_ms > start_ms else 0
 
@@ -380,6 +382,7 @@ class XfyunASRExtension(AsyncASRBaseExtension):
                     f"Xfyun ASR sub sentence end: {result_to_send}"
                 )
                 self.wpgs_buffer.clear()
+                self.ten_env.log_debug(f"Xfyun ASR result status1: start_ms: {start_ms}")
 
             if status == 2:
                 is_final = True
@@ -398,6 +401,7 @@ class XfyunASRExtension(AsyncASRBaseExtension):
                     if self.wpgs_buffer
                     else start_ms
                 )
+                self.ten_env.log_debug(f"Xfyun ASR result status2: start_ms: {start_ms}")
                 duration_ms = (
                     self.wpgs_buffer[max_sn]["ed"] - start_ms
                     if self.wpgs_buffer
@@ -406,7 +410,7 @@ class XfyunASRExtension(AsyncASRBaseExtension):
                 self.wpgs_buffer.clear()
 
             self.ten_env.log_debug(
-                f"Xfyun ASR result: {result_to_send}, status: {status}"
+                f"Xfyun ASR result: {result_to_send}, status: {status}, start_ms: {start_ms}, duration_ms: {duration_ms}"
             )
 
             # If no valid timestamps, use timeline to estimate
@@ -414,6 +418,9 @@ class XfyunASRExtension(AsyncASRBaseExtension):
                 self.audio_timeline.get_audio_duration_before_time(start_ms)
                 + self.sent_user_audio_duration_ms_before_last_reset
             )
+
+            self.ten_env.log_debug(f"self.audio_timeline.get_audio_duration_before_time(start_ms): {self.audio_timeline.get_audio_duration_before_time(start_ms)} self.sent_user_audio_duration_ms_before_last_reset: {self.sent_user_audio_duration_ms_before_last_reset} actual_start_ms: {actual_start_ms}")
+
 
             # Process ASR result
             if self.config is not None:
@@ -486,12 +493,19 @@ class XfyunASRExtension(AsyncASRBaseExtension):
 
         # Flush any buffered audio data
         if self.audio_buffer_manager and self.recognition:
-            await self.audio_buffer_manager.flush(
-                self.recognition.send_audio_frame
-            )
+            await self.audio_buffer_manager.flush()
             self.ten_env.log_debug("Flushed audio buffer during finalization")
+            self.audio_buffer_manager.disable_sending()
+            self.ten_env.log_debug("Audio buffer manager disable_sending")
 
-        await self._handle_finalize_disconnect()
+        if self.config.finalize_mode == "disconnect":
+            await self._handle_finalize_disconnect()
+        elif self.config.finalize_mode == "mute_pkg":
+            await self._handle_finalize_mute_pkg()
+        else:
+            raise ValueError(
+                f"invalid finalize mode: {self.config.finalize_mode}"
+            )
 
     async def _handle_asr_result(
         self,
@@ -523,6 +537,18 @@ class XfyunASRExtension(AsyncASRBaseExtension):
         if self.recognition:
             await self.recognition.stop()
             self.ten_env.log_debug("Xfyun ASR finalize disconnect completed")
+
+    async def _handle_finalize_mute_pkg(self):
+        """Handle mute package mode finalization"""
+        # Send silence package
+        if self.recognition and self.config:
+            mute_pkg_duration_ms = self.config.mute_pkg_duration_ms
+            silence_duration = mute_pkg_duration_ms / 1000.0
+            silence_samples = int(self.config.sample_rate * silence_duration)
+            silence_data = b"\x00" * (silence_samples * 2)  # 16-bit samples
+            self.audio_timeline.add_silence_audio(mute_pkg_duration_ms)
+            self.recognition.send_audio_frame(silence_data)
+            self.ten_env.log_debug("Xfyun ASR finalize mute package sent")
 
     async def _handle_reconnect(self):
         """Handle reconnection"""
@@ -580,10 +606,9 @@ class XfyunASRExtension(AsyncASRBaseExtension):
             self.connected = False
             self.ten_env.log_info("Xfyun ASR connection stopped")
 
-            # Reset audio buffer manager
             if self.audio_buffer_manager:
-                self.audio_buffer_manager.reset()
-                self.ten_env.log_debug("Audio buffer manager reset")
+                self.audio_buffer_manager.disable_sending()
+                self.ten_env.log_debug("Audio buffer manager disable_sending")
 
         except Exception as e:
             self.ten_env.log_error(f"Error stopping Xfyun ASR connection: {e}")
@@ -628,19 +653,10 @@ class XfyunASRExtension(AsyncASRBaseExtension):
             if self.audio_dumper:
                 await self.audio_dumper.push_bytes(audio_data)
 
-            # Update timeline
-            self.audio_timeline.add_user_audio(
-                int(len(audio_data) / (self.config.sample_rate / 1000 * 2))
-            )
-
             # Use audio buffer manager to handle audio data
             if self.audio_buffer_manager:
                 # Push audio data to buffer and send if threshold is reached or forced
-                await self.audio_buffer_manager.push_audio(
-                    audio_data=audio_data,
-                    send_callback=self.recognition.send_audio_frame,
-                    force_send=False,
-                )
+                await self.audio_buffer_manager.add_data(audio_data)
             else:
                 # Fallback to direct sending if buffer manager is not available
                 await self.recognition.send_audio_frame(audio_data)
@@ -652,3 +668,8 @@ class XfyunASRExtension(AsyncASRBaseExtension):
             self.ten_env.log_error(f"Error sending audio to Xfyun ASR: {e}")
             frame.unlock_buf(buf)
             return False
+
+    async def send_audio_frame(self, audio_data: bytes):
+        """Send audio data to Xfyun ASR"""
+        if self.recognition:
+            await self.recognition.send_audio_frame(audio_data)

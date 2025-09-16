@@ -48,18 +48,21 @@ class SpeechmaticsASRClient:
         config: SpeechmaticsASRConfig,
         ten_env: AsyncTenEnv,
         timeline: AudioTimeline,
+        duration_tracker,  # Function to get/set the duration value
     ):
         self.config = config
         self.ten_env = ten_env
         self.task = None
         self.audio_queue = asyncio.Queue()
         self.timeline = timeline
+        self.duration_tracker = (
+            duration_tracker  # Callable to get duration value
+        )
         self.audio_stream = AudioStream(
             self.audio_queue, self.config, self.timeline, ten_env
         )
         self.client_running_task: asyncio.Task | None = None
         self.client_needs_stopping = False
-        self.sent_user_audio_duration_ms_before_last_reset = 0
         self.last_drain_timestamp: int = 0
         self.session_id = None
 
@@ -293,10 +296,7 @@ class SpeechmaticsASRClient:
 
     def _handle_recognition_started(self, msg):
         self.ten_env.log_info(f"_handle_recognition_started, msg: {msg}")
-        self.sent_user_audio_duration_ms_before_last_reset += (
-            self.timeline.get_total_user_audio_duration()
-        )
-        self.timeline.reset()
+        # Extension will handle the duration update and timeline reset
         if self.on_asr_open:
             asyncio.create_task(self.on_asr_open())
 
@@ -310,7 +310,7 @@ class SpeechmaticsASRClient:
 
             _actual_start_ms = int(
                 self.timeline.get_audio_duration_before_time(start_ms)
-                + self.sent_user_audio_duration_ms_before_last_reset
+                + self.duration_tracker()
             )
 
             asr_result = ASRResult(
@@ -342,7 +342,7 @@ class SpeechmaticsASRClient:
                 _duration_ms = int(end_ms - start_ms)
                 _actual_start_ms = int(
                     self.timeline.get_audio_duration_before_time(start_ms)
-                    + self.sent_user_audio_duration_ms_before_last_reset
+                    + self.duration_tracker()
                 )
 
                 asr_result = ASRResult(
@@ -386,7 +386,7 @@ class SpeechmaticsASRClient:
                             self.timeline.get_audio_duration_before_time(
                                 start_ms
                             )
-                            + self.sent_user_audio_duration_ms_before_last_reset
+                            + self.duration_tracker()
                         )
                         result_type = result.get("type", "")
                         is_punctuation = result_type == "punctuation"
