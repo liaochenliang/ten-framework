@@ -185,7 +185,7 @@ class SpeechmaticsASRClient:
         self.session_id = session_id
 
         try:
-        
+
             await self.audio_queue.put(frame_buf)
         except Exception as e:
             self.ten_env.log_error(f"Error sending audio frame: {e}")
