@@ -3,10 +3,7 @@ import os
 from typing import Optional, Dict, Any
 
 from typing_extensions import override
-from .const import (
-    DUMP_FILE_NAME,
-    MODULE_NAME_ASR,
-)
+from .const import DUMP_FILE_NAME
 from ten_ai_base.asr import (
     ASRBufferConfig,
     ASRBufferConfigModeKeep,
@@ -17,6 +14,7 @@ from ten_ai_base.message import (
     ModuleError,
     ModuleErrorVendorInfo,
     ModuleErrorCode,
+    ModuleType,
 )
 from ten_runtime import (
     AsyncTenEnv,
@@ -54,9 +52,8 @@ class AssemblyAIASRExtension(
 
     @override
     async def on_deinit(self, ten_env: AsyncTenEnv) -> None:
+        await super().on_deinit(ten_env)
         try:
-            await self.stop_connection()
-
             if self.audio_dumper:
                 await self.audio_dumper.stop()
                 self.audio_dumper = None
@@ -68,8 +65,6 @@ class AssemblyAIASRExtension(
 
         except Exception as e:
             ten_env.log_error(f"Error during deinit: {e}")
-        finally:
-            await super().on_deinit(ten_env)
 
     @override
     def vendor(self) -> str:
@@ -101,13 +96,14 @@ class AssemblyAIASRExtension(
                     self.config.dump_path, DUMP_FILE_NAME
                 )
                 self.audio_dumper = Dumper(dump_file_path)
+                await self.audio_dumper.start()
 
         except Exception as e:
             ten_env.log_error(f"Invalid AssemblyAI ASR config: {e}")
             self.config = AssemblyAIASRConfig.model_validate_json("{}")
             await self.send_asr_error(
                 ModuleError(
-                    module=MODULE_NAME_ASR,
+                    module=ModuleType.ASR,
                     code=ModuleErrorCode.NON_FATAL_ERROR.value,
                     message=str(e),
                 ),
@@ -125,7 +121,7 @@ class AssemblyAIASRExtension(
                 self.ten_env.log_error(error_msg)
                 await self.send_asr_error(
                     ModuleError(
-                        module=MODULE_NAME_ASR,
+                        module=ModuleType.ASR,
                         code=ModuleErrorCode.FATAL_ERROR.value,
                         message=error_msg,
                     ),
@@ -134,9 +130,6 @@ class AssemblyAIASRExtension(
 
             if self.is_connected():
                 await self.stop_connection()
-
-            if self.audio_dumper:
-                await self.audio_dumper.start()
 
             assemblyai_config = {
                 "sample_rate": self.config.sample_rate,
@@ -168,7 +161,7 @@ class AssemblyAIASRExtension(
             )
             await self.send_asr_error(
                 ModuleError(
-                    module=MODULE_NAME_ASR,
+                    module=ModuleType.ASR,
                     code=ModuleErrorCode.NON_FATAL_ERROR.value,
                     message=str(e),
                 )
@@ -263,7 +256,7 @@ class AssemblyAIASRExtension(
 
         await self.send_asr_error(
             ModuleError(
-                module=MODULE_NAME_ASR,
+                module=ModuleType.ASR,
                 code=ModuleErrorCode.NON_FATAL_ERROR.value,
                 message=error_msg,
             ),
@@ -341,7 +334,7 @@ class AssemblyAIASRExtension(
             self.ten_env.log_warn("No more reconnection attempts allowed")
             await self.send_asr_error(
                 ModuleError(
-                    module=MODULE_NAME_ASR,
+                    module=ModuleType.ASR,
                     code=ModuleErrorCode.NON_FATAL_ERROR.value,
                     message="No more reconnection attempts allowed",
                 )
