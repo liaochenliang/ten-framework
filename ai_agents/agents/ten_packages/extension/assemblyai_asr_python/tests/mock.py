@@ -13,9 +13,7 @@ def patch_assemblyai_ws():
     """
     Automatically patch Recognition globally before any test runs.
     """
-    patch_target = (
-        "ten_packages.extension.assemblyai_asr_python.extension.AssemblyAIWSRecognition"
-    )
+    patch_target = "ten_packages.extension.assemblyai_asr_python.extension.AssemblyAIWSRecognition"
 
     with patch(patch_target) as MockWSClient:
         print(f"✅ Patching {patch_target} before test session.")
