@@ -136,7 +136,9 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
                 interim_results=self.config.interim_results,
                 punctuate=self.config.punctuate,
                 keywords=keywords,
-                extra={"mid_opt_out": "true"} if self.config.mid_opt_out else None,
+                extra=(
+                    {"mid_opt_out": "true"} if self.config.mid_opt_out else None
+                ),
             )
 
             # Update options with advanced params
