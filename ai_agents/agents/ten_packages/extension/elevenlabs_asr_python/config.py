@@ -14,20 +14,20 @@ class ElevenLabsASRConfig(BaseModel):
 
     # Audio settings
     sample_rate: int = 16000
-    audio_format: str = "pcm_16000"  # ElevenLabs audio format
+    audio_format: str = ""
 
     # Model settings
-    model_id: str = "scribe_v2_realtime"  # ElevenLabs model ID
+    model_id: str = ""
 
     # Real-time transcription settings
-    include_timestamps: bool = True
+    include_timestamps: bool = False
 
-    commit_strategy: str = "manual"
+    commit_strategy: str = ""
 
     enable_logging: bool = True
 
     # Language settings
-    language_code: str = "en"
+    language_code: str = ""
 
     # Debugging and dumping
     dump: bool = False
