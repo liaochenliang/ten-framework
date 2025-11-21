@@ -1,5 +1,6 @@
 from datetime import datetime
 import os
+import json
 from typing import Optional, Dict, Any
 
 from typing_extensions import override
@@ -80,10 +81,13 @@ class ElevenLabsASRExtension(
         config_json, _ = await ten_env.get_property_to_json("")
 
         try:
-            temp_config = ElevenLabsASRConfig.model_validate_json(config_json)
-            ten_env.log_info(f"ElevenLabs ASR temp_config: {temp_config}")
-            self.config = temp_config
-            self.config.update(self.config.params)
+
+            config_dict = json.loads(config_json)
+
+            params = config_dict.get("params", {})
+            if params:
+                self.config = ElevenLabsASRConfig.model_construct(**params)
+
             ten_env.log_info(f"ElevenLabs ASR config: {self.config}")
 
             ten_env.log_info(

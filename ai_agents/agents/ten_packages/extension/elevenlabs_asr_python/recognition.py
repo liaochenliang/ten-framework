@@ -195,61 +195,40 @@ class ElevenLabsWSRecognition:
         base_url = self.ws_url
         params = []
 
-        # Handle both config object and dictionary for backward compatibility
-        if isinstance(self.config, ElevenLabsASRConfig):
-            # Model ID (required for ElevenLabs)
+        # Model ID (required for ElevenLabs)
+        if hasattr(self.config, "model_id"):
             model_id = self.config.model_id
             if model_id:
                 params.append(f"model_id={model_id}")
 
-            # Audio format
+        # Audio format
+        if hasattr(self.config, "audio_format"):
             audio_format = self.config.audio_format
             if audio_format:
                 params.append(f"audio_format={audio_format}")
 
-            # Language code
+        # Language code
+        if hasattr(self.config, "language_code"):
             language_code = self.config.language_code
             if language_code:
                 params.append(f"language_code={language_code}")
 
-            # Include timestamps
+        # Include timestamps (only add if exists in config)
+        if hasattr(self.config, "include_timestamps"):
             include_timestamps = self.config.include_timestamps
             params.append(
                 f"include_timestamps={str(include_timestamps).lower()}"
             )
 
-            # Commit strategy
+        # Commit strategy (only add if exists in config)
+        if hasattr(self.config, "commit_strategy"):
             commit_strategy = self.config.commit_strategy
             if commit_strategy:
                 params.append(f"commit_strategy={commit_strategy}")
 
-            # Enable logging
+        # Enable logging (only add if exists in config)
+        if hasattr(self.config, "enable_logging"):
             enable_logging = self.config.enable_logging
-            params.append(f"enable_logging={str(enable_logging).lower()}")
-        else:
-            # Fallback to dictionary access for backward compatibility
-            model_id = self.config.get("model_id", "")
-            if model_id:
-                params.append(f"model_id={model_id}")
-
-            audio_format = self.config.get("audio_format", "pcm_16000")
-            if audio_format:
-                params.append(f"audio_format={audio_format}")
-
-            language_code = self.config.get("language_code", "en")
-            if language_code:
-                params.append(f"language_code={language_code}")
-
-            include_timestamps = self.config.get("include_timestamps", False)
-            params.append(
-                f"include_timestamps={str(include_timestamps).lower()}"
-            )
-
-            commit_strategy = self.config.get("commit_strategy", "vad")
-            if commit_strategy:
-                params.append(f"commit_strategy={commit_strategy}")
-
-            enable_logging = self.config.get("enable_logging", False)
             params.append(f"enable_logging={str(enable_logging).lower()}")
 
         self.ten_env.log_info(
@@ -305,11 +284,7 @@ class ElevenLabsWSRecognition:
     async def _consume_and_send(self):
         """Consumer loop: pull chunks from buffer and send over websocket."""
 
-        # Handle both config object and dictionary for backward compatibility
-        if isinstance(self.config, ElevenLabsASRConfig):
-            sample_rate = self.config.sample_rate
-        else:
-            sample_rate = self.config.get("sample_rate", 16000)
+        sample_rate = self.config.sample_rate
 
         try:
             while True:
@@ -352,11 +327,7 @@ class ElevenLabsWSRecognition:
                 await self.callback.on_error(f"Consumer loop error: {e}")
 
     async def send_final(self):
-        # Handle both config object and dictionary for backward compatibility
-        if isinstance(self.config, ElevenLabsASRConfig):
-            sample_rate = self.config.sample_rate
-        else:
-            sample_rate = self.config.get("sample_rate", 16000)
+        sample_rate = self.config.sample_rate
 
         audio_message = {
             "message_type": "input_audio_chunk",

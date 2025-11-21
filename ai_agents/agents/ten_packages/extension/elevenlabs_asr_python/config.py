@@ -7,27 +7,27 @@ class ElevenLabsASRConfig(BaseModel):
     """ElevenLabs ASR Configuration"""
 
     # Authentication
-    api_key: str = ""
+    api_key: str
 
     # WebSocket endpoint
-    ws_url: str = "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+    ws_url: str
 
     # Audio settings
-    sample_rate: int = 16000
-    audio_format: str = ""
+    sample_rate: int
+    audio_format: str
 
     # Model settings
-    model_id: str = ""
+    model_id: str
 
     # Real-time transcription settings
-    include_timestamps: bool = False
+    include_timestamps: bool
 
-    commit_strategy: str = ""
+    commit_strategy: str
 
-    enable_logging: bool = True
+    enable_logging: bool
 
     # Language settings
-    language_code: str = ""
+    language_code: str
 
     # Debugging and dumping
     dump: bool = False
