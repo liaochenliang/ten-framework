@@ -1,0 +1,7 @@
+{
+    "params": {
+        "api_key": "${env:ELEVENLABS_ASR_KEY}",
+        "sample_rate": 16000,
+        "language_code": "zh"
+    }
+}
