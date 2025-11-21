@@ -131,21 +131,15 @@ class ElevenLabsASRExtension(
             if self.is_connected():
                 await self.stop_connection()
 
-            elevenlabs_config = {
-                "model_id": self.config.model_id,
-                "audio_format": self.config.audio_format,
-                "language_code": self.config.language_code,
-                "include_timestamps": self.config.include_timestamps,
-                "commit_strategy": self.config.commit_strategy,
-                "enable_logging": self.config.enable_logging,
-            }
-            self.ten_env.log_info(f"ElevenLabs ASR config: {elevenlabs_config}")
+            self.ten_env.log_info(
+                f"ElevenLabs ASR config: {self.config.to_json(sensitive_handling=True)}"
+            )
             self.recognition = ElevenLabsWSRecognition(
                 api_key=self.config.api_key,
                 ws_url=self.config.ws_url,
                 audio_timeline=self.audio_timeline,
                 ten_env=self.ten_env,
-                config=elevenlabs_config,
+                config=self.config,
                 callback=self,
             )
 

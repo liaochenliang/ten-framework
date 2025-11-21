@@ -3,13 +3,14 @@ import json
 import re
 import base64
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 import websockets
 from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from websockets.protocol import State
 
 from .audio_buffer_manager import AudioBufferManager
+from .config import ElevenLabsASRConfig
 from ten_ai_base.timeline import AudioTimeline
 from ten_ai_base.const import (
     LOG_CATEGORY_VENDOR,
@@ -53,7 +54,7 @@ class ElevenLabsWSRecognition:
         ws_url: str,
         audio_timeline=AudioTimeline,
         ten_env=AsyncTenEnv,
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[Union[ElevenLabsASRConfig, Dict[str, Any]]] = None,
         callback: Optional[ElevenLabsWSRecognitionCallback] = None,
     ):
         """
@@ -62,14 +63,14 @@ class ElevenLabsWSRecognition:
         :param ws_url: WebSocket URL endpoint
         :param audio_timeline: Audio timeline for timestamp management
         :param ten_env: Ten environment object for logging
-        :param config: Configuration parameter dictionary
+        :param config: Configuration object (ElevenLabsASRConfig) or parameter dictionary
         :param callback: Callback instance for handling events
         """
         self.api_key = api_key
         self.ws_url = ws_url
         self.audio_timeline = audio_timeline
         self.ten_env = ten_env
-        self.config = config or {}
+        self.config = config or ElevenLabsASRConfig()
         self.callback = callback
         self.websocket = None
         self.is_started = False
@@ -194,50 +195,62 @@ class ElevenLabsWSRecognition:
         base_url = self.ws_url
         params = []
 
-        # Model ID (required for ElevenLabs)
-        model_id = self.config.get("model_id", "")
-        if model_id:
-            params.append(f"model_id={model_id}")
+        # Handle both config object and dictionary for backward compatibility
+        if isinstance(self.config, ElevenLabsASRConfig):
+            # Model ID (required for ElevenLabs)
+            model_id = self.config.model_id
+            if model_id:
+                params.append(f"model_id={model_id}")
 
-        # Audio format
-        audio_format = self.config.get("audio_format", "pcm_16000")
-        if audio_format:
-            params.append(f"audio_format={audio_format}")
+            # Audio format
+            audio_format = self.config.audio_format
+            if audio_format:
+                params.append(f"audio_format={audio_format}")
 
-        # Language code
-        language_code = self.config.get("language_code", "en")
-        if language_code:
-            params.append(f"language_code={language_code}")
+            # Language code
+            language_code = self.config.language_code
+            if language_code:
+                params.append(f"language_code={language_code}")
 
-        # Include timestamps
-        include_timestamps = self.config.get("include_timestamps", False)
-        params.append(f"include_timestamps={str(include_timestamps).lower()}")
+            # Include timestamps
+            include_timestamps = self.config.include_timestamps
+            params.append(
+                f"include_timestamps={str(include_timestamps).lower()}"
+            )
 
-        # Commit strategy
-        commit_strategy = self.config.get("commit_strategy", "vad")
-        if commit_strategy:
-            params.append(f"commit_strategy={commit_strategy}")
+            # Commit strategy
+            commit_strategy = self.config.commit_strategy
+            if commit_strategy:
+                params.append(f"commit_strategy={commit_strategy}")
 
-        # VAD parameters
-        # vad_silence_threshold_secs = self.config.get("vad_silence_threshold_secs")
-        # if vad_silence_threshold_secs is not None:
-        #     params.append(f"vad_silence_threshold_secs={vad_silence_threshold_secs}")
+            # Enable logging
+            enable_logging = self.config.enable_logging
+            params.append(f"enable_logging={str(enable_logging).lower()}")
+        else:
+            # Fallback to dictionary access for backward compatibility
+            model_id = self.config.get("model_id", "")
+            if model_id:
+                params.append(f"model_id={model_id}")
 
-        # vad_threshold = self.config.get("vad_threshold")
-        # if vad_threshold is not None:
-        #     params.append(f"vad_threshold={vad_threshold}")
+            audio_format = self.config.get("audio_format", "pcm_16000")
+            if audio_format:
+                params.append(f"audio_format={audio_format}")
 
-        # min_speech_duration_ms = self.config.get("min_speech_duration_ms")
-        # if min_speech_duration_ms is not None:
-        #     params.append(f"min_speech_duration_ms={min_speech_duration_ms}")
+            language_code = self.config.get("language_code", "en")
+            if language_code:
+                params.append(f"language_code={language_code}")
 
-        # min_silence_duration_ms = self.config.get("min_silence_duration_ms")
-        # if min_silence_duration_ms is not None:
-        #     params.append(f"min_silence_duration_ms={min_silence_duration_ms}")
+            include_timestamps = self.config.get("include_timestamps", False)
+            params.append(
+                f"include_timestamps={str(include_timestamps).lower()}"
+            )
 
-        # Enable logging
-        enable_logging = self.config.get("enable_logging", False)
-        params.append(f"enable_logging={str(enable_logging).lower()}")
+            commit_strategy = self.config.get("commit_strategy", "vad")
+            if commit_strategy:
+                params.append(f"commit_strategy={commit_strategy}")
+
+            enable_logging = self.config.get("enable_logging", False)
+            params.append(f"enable_logging={str(enable_logging).lower()}")
 
         self.ten_env.log_info(
             f"[ElevenLabs] Building websocket url with params: {params}"
@@ -292,7 +305,11 @@ class ElevenLabsWSRecognition:
     async def _consume_and_send(self):
         """Consumer loop: pull chunks from buffer and send over websocket."""
 
-        sample_rate = self.config.get("sample_rate", 16000)
+        # Handle both config object and dictionary for backward compatibility
+        if isinstance(self.config, ElevenLabsASRConfig):
+            sample_rate = self.config.sample_rate
+        else:
+            sample_rate = self.config.get("sample_rate", 16000)
 
         try:
             while True:
@@ -335,11 +352,17 @@ class ElevenLabsWSRecognition:
                 await self.callback.on_error(f"Consumer loop error: {e}")
 
     async def send_final(self):
+        # Handle both config object and dictionary for backward compatibility
+        if isinstance(self.config, ElevenLabsASRConfig):
+            sample_rate = self.config.sample_rate
+        else:
+            sample_rate = self.config.get("sample_rate", 16000)
+
         audio_message = {
             "message_type": "input_audio_chunk",
             "audio_base_64": "",
             "commit": True,
-            "sample_rate": self.config.get("sample_rate", 16000),
+            "sample_rate": sample_rate,
         }
         self.ten_env.log_info("[ElevenLabs] WebSocket send final")
         await self.websocket.send(json.dumps(audio_message))
