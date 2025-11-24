@@ -50,8 +50,6 @@ class ElevenLabsWSRecognition:
 
     def __init__(
         self,
-        api_key: str,
-        ws_url: str,
         audio_timeline=AudioTimeline,
         ten_env=AsyncTenEnv,
         params: Optional[Dict[str, Any]] = None,
@@ -59,15 +57,11 @@ class ElevenLabsWSRecognition:
     ):
         """
         Initialize ElevenLabs WebSocket speech recognition
-        :param api_key: ElevenLabs API key
-        :param ws_url: WebSocket URL endpoint
         :param audio_timeline: Audio timeline for timestamp management
         :param ten_env: Ten environment object for logging
         :param params: Parameter dictionary containing configuration
         :param callback: Callback instance for handling events
         """
-        self.api_key = api_key
-        self.ws_url = ws_url
         self.audio_timeline = audio_timeline
         self.ten_env = ten_env
         self.params = params or {}
@@ -76,6 +70,9 @@ class ElevenLabsWSRecognition:
         self.is_started = False
         self._message_task: Optional[asyncio.Task] = None
         self._consumer_task: Optional[asyncio.Task] = None
+
+        self.api_key = params.get("api_key")
+        self.ws_url = params.get("ws_url")
 
         self.audio_buffer = AudioBufferManager(
             ten_env=self.ten_env, threshold=640

@@ -148,8 +148,6 @@ class ElevenLabsASRExtension(
                 f"ElevenLabs ASR config: {self.config.to_json()}"
             )
             self.recognition = ElevenLabsWSRecognition(
-                api_key=self.config.params.get("api_key"),
-                ws_url=self.config.params.get("ws_url"),
                 audio_timeline=self.audio_timeline,
                 ten_env=self.ten_env,
                 params=self.config.params,
