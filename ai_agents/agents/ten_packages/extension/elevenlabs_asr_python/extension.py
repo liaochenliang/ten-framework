@@ -1,6 +1,5 @@
 from datetime import datetime
 import os
-import json
 from typing import Optional, Dict, Any
 
 from typing_extensions import override
@@ -79,22 +78,12 @@ class ElevenLabsASRExtension(
         self.reconnect_manager = ReconnectManager(logger=ten_env)
 
         config_json, _ = await ten_env.get_property_to_json("")
-
         try:
-
-            config_dict = json.loads(config_json)
-
-            params = config_dict.get("params", {})
-            if params:
-                self.config = ElevenLabsASRConfig.model_construct(**params)
-
-            ten_env.log_info(f"ElevenLabs ASR config: {self.config}")
-
+            self.config = ElevenLabsASRConfig().model_validate_json(config_json)
             ten_env.log_info(
-                f"ElevenLabs ASR config: {self.config.to_json(sensitive_handling=True)}",
+                f"ElevenLabs ASR config: {self.config.to_json()}",
                 category=LOG_CATEGORY_KEY_POINT,
             )
-
             if self.config.dump:
                 dump_file_path = os.path.join(
                     self.config.dump_path, DUMP_FILE_NAME
@@ -120,8 +109,28 @@ class ElevenLabsASRExtension(
         self.ten_env.log_info("Starting ElevenLabs ASR connection")
 
         try:
-            if not self.config.api_key or self.config.api_key.strip() == "":
+            if (
+                not self.config.params.get("api_key")
+                or self.config.params.get("api_key").strip() == ""
+            ):
                 error_msg = "ElevenLabs API key is required but not provided or is empty"
+                self.ten_env.log_error(error_msg)
+                await self.send_asr_error(
+                    ModuleError(
+                        module=ModuleType.ASR,
+                        code=ModuleErrorCode.FATAL_ERROR.value,
+                        message=error_msg,
+                    ),
+                )
+                return
+
+            if (
+                not self.config.params.get("ws_url")
+                or self.config.params.get("ws_url").strip() == ""
+            ):
+                error_msg = (
+                    "ElevenLabs WS URL is required but not provided or is empty"
+                )
                 self.ten_env.log_error(error_msg)
                 await self.send_asr_error(
                     ModuleError(
@@ -136,14 +145,14 @@ class ElevenLabsASRExtension(
                 await self.stop_connection()
 
             self.ten_env.log_info(
-                f"ElevenLabs ASR config: {self.config.to_json(sensitive_handling=True)}"
+                f"ElevenLabs ASR config: {self.config.to_json()}"
             )
             self.recognition = ElevenLabsWSRecognition(
-                api_key=self.config.api_key,
-                ws_url=self.config.ws_url,
+                api_key=self.config.params.get("api_key"),
+                ws_url=self.config.params.get("ws_url"),
                 audio_timeline=self.audio_timeline,
                 ten_env=self.ten_env,
-                config=self.config,
+                params=self.config.params,
                 callback=self,
             )
 
@@ -391,11 +400,7 @@ class ElevenLabsASRExtension(
     def input_audio_sample_rate(self) -> int:
         """Input audio sample rate"""
         assert self.config is not None
-        # Extract sample rate from audio format (e.g., "pcm_16000" -> 16000)
-        audio_format = self.config.audio_format
-        if "_" in audio_format:
-            return int(audio_format.split("_")[-1])
-        return self.config.sample_rate
+        return int(self.config.params.get("sample_rate", 16000))
 
     @override
     async def send_audio(

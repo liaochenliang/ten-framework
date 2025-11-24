@@ -3,14 +3,14 @@ import json
 import re
 import base64
 
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any
 import websockets
 from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from websockets.protocol import State
 
 from .audio_buffer_manager import AudioBufferManager
-from .config import ElevenLabsASRConfig
+
 from ten_ai_base.timeline import AudioTimeline
 from ten_ai_base.const import (
     LOG_CATEGORY_VENDOR,
@@ -54,7 +54,7 @@ class ElevenLabsWSRecognition:
         ws_url: str,
         audio_timeline=AudioTimeline,
         ten_env=AsyncTenEnv,
-        config: Optional[Union[ElevenLabsASRConfig, Dict[str, Any]]] = None,
+        params: Optional[Dict[str, Any]] = None,
         callback: Optional[ElevenLabsWSRecognitionCallback] = None,
     ):
         """
@@ -63,14 +63,14 @@ class ElevenLabsWSRecognition:
         :param ws_url: WebSocket URL endpoint
         :param audio_timeline: Audio timeline for timestamp management
         :param ten_env: Ten environment object for logging
-        :param config: Configuration object (ElevenLabsASRConfig) or parameter dictionary
+        :param params: Parameter dictionary containing configuration
         :param callback: Callback instance for handling events
         """
         self.api_key = api_key
         self.ws_url = ws_url
         self.audio_timeline = audio_timeline
         self.ten_env = ten_env
-        self.config = config or ElevenLabsASRConfig()
+        self.params = params or {}
         self.callback = callback
         self.websocket = None
         self.is_started = False
@@ -193,49 +193,23 @@ class ElevenLabsWSRecognition:
     def _build_websocket_url(self) -> str:
         """Build WebSocket URL with query parameters for ElevenLabs"""
         base_url = self.ws_url
-        params = []
+        query_params = []
 
-        # Model ID (required for ElevenLabs)
-        if hasattr(self.config, "model_id"):
-            model_id = self.config.model_id
-            if model_id:
-                params.append(f"model_id={model_id}")
+        excluded_params = {"ws_url", "api_key"}
 
-        # Audio format
-        if hasattr(self.config, "audio_format"):
-            audio_format = self.config.audio_format
-            if audio_format:
-                params.append(f"audio_format={audio_format}")
-
-        # Language code
-        if hasattr(self.config, "language_code"):
-            language_code = self.config.language_code
-            if language_code:
-                params.append(f"language_code={language_code}")
-
-        # Include timestamps (only add if exists in config)
-        if hasattr(self.config, "include_timestamps"):
-            include_timestamps = self.config.include_timestamps
-            params.append(
-                f"include_timestamps={str(include_timestamps).lower()}"
-            )
-
-        # Commit strategy (only add if exists in config)
-        if hasattr(self.config, "commit_strategy"):
-            commit_strategy = self.config.commit_strategy
-            if commit_strategy:
-                params.append(f"commit_strategy={commit_strategy}")
-
-        # Enable logging (only add if exists in config)
-        if hasattr(self.config, "enable_logging"):
-            enable_logging = self.config.enable_logging
-            params.append(f"enable_logging={str(enable_logging).lower()}")
+        for param_key, value in self.params.items():
+            if param_key not in excluded_params and value is not None:
+                if isinstance(value, bool):
+                    query_params.append(f"{param_key}={str(value).lower()}")
+                elif value:
+                    query_params.append(f"{param_key}={value}")
 
         self.ten_env.log_info(
-            f"[ElevenLabs] Building websocket url with params: {params}"
+            f"[ElevenLabs] Building websocket url with params: {query_params}"
         )
-        if params:
-            url = f"{base_url}?{'&'.join(params)}"
+
+        if query_params:
+            url = f"{base_url}?{'&'.join(query_params)}"
         else:
             url = base_url
 
@@ -284,7 +258,7 @@ class ElevenLabsWSRecognition:
     async def _consume_and_send(self):
         """Consumer loop: pull chunks from buffer and send over websocket."""
 
-        sample_rate = self.config.sample_rate
+        sample_rate = self.params.get("sample_rate", 16000)
 
         try:
             while True:
@@ -327,7 +301,7 @@ class ElevenLabsWSRecognition:
                 await self.callback.on_error(f"Consumer loop error: {e}")
 
     async def send_final(self):
-        sample_rate = self.config.sample_rate
+        sample_rate = self.params.get("sample_rate", 16000)
 
         audio_message = {
             "message_type": "input_audio_chunk",
