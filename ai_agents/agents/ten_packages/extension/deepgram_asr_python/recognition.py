@@ -62,6 +62,8 @@ class DeepgramASRRecognition:
         if self.config is None:
             self.config = {}
 
+        self.config["mip_opt_out"] = True
+
         self.callback = callback
 
         self.websocket = None
