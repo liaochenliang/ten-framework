@@ -9,7 +9,7 @@ class DeepgramASRConfig(BaseModel):
     # Debugging and dumping
     dump: bool = False
     dump_path: str = "/tmp"
-    finalize_mode: str = "mute_pkg"
+    finalize_mode: str = "disconnect"  # "disconnect" or "mute_pkg"
     mute_pkg_duration_ms: int = 1000
     # Additional parameters
     params: Dict[str, Any] = Field(default_factory=dict)

@@ -3,8 +3,6 @@ import asyncio
 import websockets
 import datetime
 
-import ssl
-from datetime import datetime
 import json
 from .const import TIMEOUT_CODE
 from websockets.protocol import State
@@ -83,8 +81,6 @@ class DeepgramASRRecognition:
             message_type = message_data.get("type")
             if message_type == "Results":
                 await self.callback.on_result(message_data)
-            elif message_type == "UtteranceEnd":
-                await self.callback.on_close()
 
         except Exception as e:
             error_msg = f"Error processing message: {e}"
@@ -155,17 +151,12 @@ class DeepgramASRRecognition:
             url = self.append_query_params(self.url)
             self.ten_env.log_info(f"Connecting to Deepgram: {url}")
 
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-
             self.websocket = await websockets.connect(
                 url,
                 additional_headers=[
                     ("Authorization", f"Token {self.api_key}"),
                     ("Content-Type", "application/octet-stream"),
                 ],
-                ssl=ssl_context,
                 open_timeout=timeout,
             )
 
@@ -235,7 +226,7 @@ class DeepgramASRRecognition:
             self.is_started = False
             if self.ten_env:
                 self.ten_env.log_info(
-                    f"vendor_cmd: ${json.dumps(d)}",
+                    f"vendor_cmd: {json.dumps(d)}",
                     category=LOG_CATEGORY_VENDOR,
                 )
 
