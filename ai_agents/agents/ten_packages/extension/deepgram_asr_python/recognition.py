@@ -1,7 +1,6 @@
 from abc import abstractmethod
 import asyncio
 import websockets
-import datetime
 
 import json
 from .const import TIMEOUT_CODE
@@ -85,7 +84,7 @@ class DeepgramASRRecognition:
         except Exception as e:
             error_msg = f"Error processing message: {e}"
             self.ten_env.log_info(
-                f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {error_msg}"
+                f"DeepgramASRRecognition._handle_message error: {error_msg}"
             )
             await self.callback.on_error(error_msg)
 
