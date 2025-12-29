@@ -149,21 +149,13 @@ class DeepgramASRExtension(
             else:
                 error_msg = "Failed to start Deepgram connection"
                 self.ten_env.log_error(error_msg)
-                await self.send_asr_error(
-                    ModuleError(
-                        module=MODULE_NAME_ASR,
-                        code=ModuleErrorCode.NON_FATAL_ERROR.value,
-                        message=error_msg,
-                    ),
-                )
-                await self._handle_reconnect()
 
         except Exception as e:
             self.ten_env.log_error(f"Failed to start Deepgram connection: {e}")
             await self.send_asr_error(
                 ModuleError(
                     module=MODULE_NAME_ASR,
-                    code=ModuleErrorCode.NON_FATAL_ERROR.value,
+                    code=ModuleErrorCode.FATAL_ERROR.value,
                     message=str(e),
                 ),
             )
@@ -232,19 +224,11 @@ class DeepgramASRExtension(
 
     async def _handle_reconnect(self):
         """Handle reconnection"""
-        # Check if retry is still possible
-        if not self.reconnect_manager.can_retry():
-            self.ten_env.log_warn("No more reconnection attempts allowed")
-            await self.send_asr_error(
-                ModuleError(
-                    module=MODULE_NAME_ASR,
-                    code=ModuleErrorCode.NON_FATAL_ERROR.value,
-                    message="No more reconnection attempts allowed",
-                )
-            )
+        # Attempt reconnection
+        if not self.reconnect_manager:
+            self.ten_env.log_error("ReconnectManager not initialized")
             return
 
-        # Attempt reconnection
         success = await self.reconnect_manager.handle_reconnect(
             connection_func=self.start_connection,
             error_handler=self.send_asr_error,
@@ -273,11 +257,12 @@ class DeepgramASRExtension(
 
     async def stop_connection(self) -> None:
         """Stop ASR connection"""
+        self.ten_env.log_info("Deepgram stop_connection stop_connection")
         try:
             if self.recognition:
                 await self.recognition.close()
                 self.recognition = None
-            self.ten_env.log_info("Deepgram connection stopped")
+            self.ten_env.log_info("Deepgram connection stopped1")
         except Exception as e:
             self.ten_env.log_error(f"Error stopping Deepgram connection: {e}")
 
