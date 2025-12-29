@@ -55,17 +55,41 @@ class DeepgramASRRecognition:
         self.audio_timeline = audio_timeline
 
         self.config = config
-
         if self.config is None:
             self.config = {}
-
         self.config["mip_opt_out"] = True
 
         self.callback = callback
 
+        self.keepalive_enabled = bool(self.config.get("keepalive"))
+        self._keepalive_task = None
+
         self.websocket = None
         self.is_started = False
         self._message_task = None
+
+    async def _keepalive_loop(self):
+        """
+        WebSocket KeepAlive task: every 5 seconds sends {"type": "KeepAlive"} message when enabled and connected. Exits on error or disconnect.
+        """
+        try:
+            while self.is_started and self.websocket and self.keepalive_enabled:
+                await asyncio.sleep(5)
+                if not self.is_connected() or self.websocket is None:
+                    break
+                try:
+                    await self.websocket.send(json.dumps({"type": "KeepAlive"}))
+                    self.ten_env.log_debug(
+                        "[KeepAlive] Heartbeat sent",
+                        category=LOG_CATEGORY_VENDOR,
+                    )
+                except Exception as e:
+                    self.ten_env.log_info(f"KeepAlive send failed: {e}")
+                    break
+        except asyncio.CancelledError:
+            self.ten_env.log_info("KeepAlive task cancelled")
+        except Exception as e:
+            self.ten_env.log_info(f"KeepAlive task exception: {e}")
 
     async def _handle_message(self, message):
         """Handle WebSocket message"""
@@ -118,6 +142,7 @@ class DeepgramASRRecognition:
             "url",
             "key",
             "api_key",
+            "keepalive",
             "mute_pkg_duration_ms",
             "finalize_mode",
         }
@@ -162,8 +187,15 @@ class DeepgramASRRecognition:
             self.ten_env.log_info("### WebSocket opened ###")
             self.is_started = True
 
-            # Start message handler task
             self._message_task = asyncio.create_task(self._message_handler())
+
+            if self.keepalive_enabled:
+                self.ten_env.log_info(
+                    "KeepAlive enabled: send heartbeat every 5 seconds"
+                )
+                self._keepalive_task = asyncio.create_task(
+                    self._keepalive_loop()
+                )
 
             return True
         except asyncio.TimeoutError:
@@ -237,6 +269,15 @@ class DeepgramASRRecognition:
 
     async def close(self):
         """Close WebSocket connection"""
+
+        if self._keepalive_task and not self._keepalive_task.done():
+            self._keepalive_task.cancel()
+            try:
+                await self._keepalive_task
+            except asyncio.CancelledError:
+                pass
+            self._keepalive_task = None
+
         if self.websocket:
             try:
                 if self.websocket.state == State.OPEN:
