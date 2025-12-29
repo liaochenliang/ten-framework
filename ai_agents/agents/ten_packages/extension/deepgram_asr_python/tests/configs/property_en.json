@@ -8,6 +8,6 @@
     "encoding": "linear16",
     "interim_results": true,
     "punctuate": true,
-    "keepalive": true
+    "keep_alive": true
   }
 }

@@ -61,7 +61,7 @@ class DeepgramASRRecognition:
 
         self.callback = callback
 
-        self.keepalive_enabled = bool(self.config.get("keepalive"))
+        self.keepalive_enabled = bool(self.config.get("keep_alive"))
         self._keepalive_task = None
 
         self.websocket = None
