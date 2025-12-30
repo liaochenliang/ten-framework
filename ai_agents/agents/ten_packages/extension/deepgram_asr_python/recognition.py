@@ -142,7 +142,7 @@ class DeepgramASRRecognition:
             "url",
             "key",
             "api_key",
-            "keepalive",
+            "keep_alive",
             "mute_pkg_duration_ms",
             "finalize_mode",
         }
