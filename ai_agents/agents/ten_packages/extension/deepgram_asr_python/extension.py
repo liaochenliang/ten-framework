@@ -140,15 +140,7 @@ class DeepgramASRExtension(
                 callback=self,
             )
 
-            # Start recognition (now async)
-            success = await self.recognition.start()
-            if success:
-                self.ten_env.log_info(
-                    "Deepgram connection started successfully"
-                )
-            else:
-                error_msg = "Failed to start Deepgram connection"
-                self.ten_env.log_error(error_msg)
+            await self.recognition.start()
 
         except Exception as e:
             self.ten_env.log_error(f"Failed to start Deepgram connection: {e}")

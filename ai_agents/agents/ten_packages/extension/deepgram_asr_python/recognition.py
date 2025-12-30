@@ -169,7 +169,6 @@ class DeepgramASRRecognition:
         """
         if self.is_connected():
             self.ten_env.log_info("Recognition already started")
-            return True
 
         try:
             url = self.append_query_params(self.url)
@@ -197,17 +196,15 @@ class DeepgramASRRecognition:
                     self._keepalive_loop()
                 )
 
-            return True
         except asyncio.TimeoutError:
             error_msg = f"Connection timeout after {timeout} seconds"
             self.ten_env.log_error(f"Failed to start recognition: {error_msg}")
             await self.callback.on_error(error_msg, TIMEOUT_CODE)
-            return False
+
         except Exception as e:
             error_msg = f"Failed to start recognition: {e}"
             self.ten_env.log_error(error_msg)
             await self.callback.on_error(error_msg)
-            return False
 
     async def send_audio_frame(self, audio_data):
         """
