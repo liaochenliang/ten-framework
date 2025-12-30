@@ -200,7 +200,7 @@ class DeepgramASRExtension(
         """Handle disconnect mode finalization"""
         if self.recognition:
             await self.recognition.stop()
-            self.ten_env.log_debug("Deepgram finalize disconnect completed")
+            self.ten_env.log_debug("Deepgram finalize completed")
 
     async def _handle_finalize_mute_pkg(self):
         """Handle mute package mode finalization"""

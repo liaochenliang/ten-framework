@@ -16,7 +16,8 @@ All parameters are configured through the `params` object:
         "sample_rate": 16000,
         "encoding": "linear16",
         "interim_results": true,
-        "punctuate": true
+        "punctuate": true,
+        "keep_alive": true
     }
 }
 ```

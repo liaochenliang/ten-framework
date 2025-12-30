@@ -196,6 +196,8 @@ class DeepgramASRRecognition:
                     self._keepalive_loop()
                 )
 
+            await self.callback.on_open()
+
         except asyncio.TimeoutError:
             error_msg = f"Connection timeout after {timeout} seconds"
             self.ten_env.log_error(f"Failed to start recognition: {error_msg}")
@@ -251,7 +253,6 @@ class DeepgramASRRecognition:
             ws = self.websocket
             if ws is not None:
                 await ws.send(json.dumps(d))
-            self.is_started = False
             if self.ten_env:
                 self.ten_env.log_info(
                     f"vendor_cmd: {json.dumps(d)}",
