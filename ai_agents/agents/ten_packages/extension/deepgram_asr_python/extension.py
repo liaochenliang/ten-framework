@@ -27,6 +27,7 @@ from ten_ai_base.const import (
     LOG_CATEGORY_KEY_POINT,
 )
 
+from .const import TIMEOUT_CODE
 from ten_ai_base.dumper import Dumper
 from .reconnect_manager import ReconnectManager
 from .recognition import DeepgramASRRecognition, DeepgramASRRecognitionCallback
@@ -371,20 +372,22 @@ class DeepgramASRExtension(
             f"vendor_error: code: {error_code}, reason: {error_msg}",
             category=LOG_CATEGORY_VENDOR,
         )
-
-        # Send error information
-        await self.send_asr_error(
-            ModuleError(
-                module=MODULE_NAME_ASR,
-                code=ModuleErrorCode.NON_FATAL_ERROR.value,
-                message=error_msg,
-            ),
-            ModuleErrorVendorInfo(
-                vendor=self.vendor(),
-                code=str(error_code) if error_code else "unknown",
-                message=error_msg,
-            ),
-        )
+        if error_code == TIMEOUT_CODE:
+            await self._handle_reconnect()
+        else:
+            # Send error information
+            await self.send_asr_error(
+                ModuleError(
+                    module=MODULE_NAME_ASR,
+                    code=ModuleErrorCode.NON_FATAL_ERROR.value,
+                    message=error_msg,
+                ),
+                ModuleErrorVendorInfo(
+                    vendor=self.vendor(),
+                    code=str(error_code) if error_code else "unknown",
+                    message=error_msg,
+                ),
+            )
 
     @override
     async def on_close(self) -> None:
