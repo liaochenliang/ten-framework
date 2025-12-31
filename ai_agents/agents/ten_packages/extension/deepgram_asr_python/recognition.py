@@ -142,10 +142,23 @@ class DeepgramASRRecognition:
             "url",
             "key",
             "api_key",
+            "hotwords",
             "keep_alive",
             "mute_pkg_duration_ms",
             "finalize_mode",
         }
+
+        keywords = []
+        if self.config.get("hotwords"):
+            for hw in self.config.get("hotwords"):
+                tokens = hw.split("|")
+                if len(tokens) == 2 and tokens[1].isdigit():
+                    keywords.append(":".join(tokens))  # replase to ":"
+                else:
+                    self.ten_env.log_warn("invalid hotword format: " + hw)
+        if keywords:
+            result = "&".join([f"keywords={item}" for item in keywords])
+            query_params.append(f"{result}")
 
         for param_key, value in self.config.items():
             if param_key not in excluded_params and value is not None:
